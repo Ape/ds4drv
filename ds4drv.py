@@ -255,6 +255,11 @@ JOYSTICK_LAYOUTS = {
 }
 
 
+RUMBLE_REFRESH_TIME = 4
+RUMBLE_BIG_POWER    = 255
+RUMBLE_SMALL_POWER  = 255
+
+
 
 class Daemon(object):
     lock = Lock()
@@ -437,6 +442,9 @@ class UInputDevice(object):
         self.mouse.write(ecodes.EV_KEY, ecodes.BTN_LEFT,
                          int(report.button_trackpad))
         self.mouse.syn()
+
+    def read_rumble_event(self):
+        return self.joystick.read()
 
 
 class DS4Device(object):
@@ -762,6 +770,10 @@ def read_device(device, controller):
 
     led_last_flash = time()
     led_flashing = True
+
+    rumble_last_refresh = time()
+    rumble_enabled = False
+
     for report in device.reports:
         if options.battery_flash:
             if report.battery < 2 and not report.plug_usb:
@@ -782,6 +794,17 @@ def read_device(device, controller):
 
 
         controller.joystick.emit(report)
+
+        rumble_event = controller.joystick.read_rumble_event()
+
+        if rumble_event == ecodes.FF_STATUS_PLAYING:
+            rumble_enabled = True
+        elif rumble_event == ecodes.FF_STATUS_STOPPED:
+            rumble_enabled = False
+
+        if rumble_event != None or (rumble_enabled and (time() - rumble_last_refresh) > RUMBLE_REFRESH_TIME):
+            device.control(big_rumble = rumble_enabled * RUMBLE_BIG_POWER, small_rumble = rumble_enabled * RUMBLE_SMALL_POWER)
+            rumble_last_refresh = time()
 
     Daemon.info("Disconnected",
                 subprefix=CONTROLLER_LOG.format(controller.id))
