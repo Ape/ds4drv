@@ -592,7 +592,7 @@ class DS4Device(object):
 
 class ControllerAction(argparse.Action):
     __options__ = ["battery_flash", "emulate_xboxdrv", "emulate_xpad",
-                   "emulate_xpad_wireless", "led", "trackpad_mouse"]
+                   "emulate_xpad_wireless", "led", "no_rumble", "trackpad_mouse"]
 
     @classmethod
     def default_controller(cls):
@@ -665,6 +665,8 @@ controllopt.add_argument("--led", metavar="color", default="0000ff",
                          type=hexcolor,
                          help="sets color of the LED. Uses hex color codes, "
                               "e.g. 'ff0000' is red. Default is '0000ff' (blue)")
+controllopt.add_argument("--no-rumble", action="store_true",
+                         help="disables rumble effects")
 controllopt.add_argument("--trackpad-mouse", action="store_true",
                          help="makes the trackpad control the mouse")
 controllopt.add_argument("--next-controller", nargs=0, action=ControllerAction,
@@ -795,16 +797,17 @@ def read_device(device, controller):
 
         controller.joystick.emit(report)
 
-        rumble_event = controller.joystick.read_rumble_event()
+        if not options.no_rumble:
+            rumble_event = controller.joystick.read_rumble_event()
 
-        if rumble_event == ecodes.FF_STATUS_PLAYING:
-            rumble_enabled = True
-        elif rumble_event == ecodes.FF_STATUS_STOPPED:
-            rumble_enabled = False
+            if rumble_event == ecodes.FF_STATUS_PLAYING:
+                rumble_enabled = True
+            elif rumble_event == ecodes.FF_STATUS_STOPPED:
+                rumble_enabled = False
 
-        if rumble_event != None or (rumble_enabled and (time() - rumble_last_refresh) > RUMBLE_REFRESH_TIME):
-            device.control(big_rumble = rumble_enabled * RUMBLE_BIG_POWER, small_rumble = rumble_enabled * RUMBLE_SMALL_POWER)
-            rumble_last_refresh = time()
+            if rumble_event != None or (rumble_enabled and (time() - rumble_last_refresh) > RUMBLE_REFRESH_TIME):
+                device.control(big_rumble = rumble_enabled * RUMBLE_BIG_POWER, small_rumble = rumble_enabled * RUMBLE_SMALL_POWER)
+                rumble_last_refresh = time()
 
     Daemon.info("Disconnected",
                 subprefix=CONTROLLER_LOG.format(controller.id))
